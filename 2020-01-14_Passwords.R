@@ -26,7 +26,7 @@ passwords %>%
                size = 0.7) +
   geom_hline(aes(yintercept = strength_avg), color = "gray70", size = 0.6) +
   stat_summary(fun.y = mean, geom = "point", size = 5) +
-  geom_jitter(alpha = 0.3, size = 2) + 
+  geom_jitter(alpha = 0.4, size = 2) + 
   theme_minimal() + 
   coord_flip() + 
   annotate("text", x = 10, y = 12.5, fontface = "italic",
@@ -38,7 +38,7 @@ passwords %>%
   annotate("text", x = 1.75, y = 43, fontface = "italic", 
            size = 2.7, color = "gray20", 
            label = glue::glue("rush2112")) +
-  geom_curve(x = 1.75, xend = 1, y = 45.5, yend = 47.5, 
+  geom_curve(x = 1.75, xend = 0.8, y = 45.5, yend = 47.5, 
              arrow = arrow(length = unit(0.08, "inch")), size = 0.5,
              color = "gray20", curvature = -0.3) +
   annotate("text", x = 2.25, y = 17, fontface = "italic", 
