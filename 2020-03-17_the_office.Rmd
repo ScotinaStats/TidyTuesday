@@ -10,6 +10,97 @@ office_scripts <- schrute::theoffice
 #View(office_scripts)
 ```
 
+"That's what she said" by character:
+```{r}
+# Find line/character combo right before a "TWSS"
+# Initialize (might be a bit hacky, but works)
+office_scripts$text_before = c()
+office_scripts$text_before[1] = NA
+office_scripts$text_before[2:nrow(office_scripts)] = office_scripts$text[1:(nrow(office_scripts)-1)]
+
+office_scripts$character_before = c()
+office_scripts$character_before[1] = NA
+office_scripts$character_before[2:nrow(office_scripts)] = office_scripts$character[1:(nrow(office_scripts)-1)]
+
+# Filter for TWSS lines only 
+office_scripts_twss = office_scripts %>%
+  filter(str_detect(text, pattern = "That's what she said|that's what she said"))
+
+office_scripts_twss %>%
+  count(character, sort = TRUE)
+# Might not include ALL occurrences? E.g., if a character said "TWSS" twice in a single line...
+
+#office_scripts_twss = office_scripts %>%
+#  filter(str_count(text, pattern = "That's what she said|that's what she said") > 0)
+# (We'll go with unique lines for simplicity)
+
+office_scripts_twss %>%
+  select(character, text_before) %>% 
+  View()
+
+office_scripts_twss %>%
+  count(character, sort = TRUE) %>%
+  ggplot(aes(x = fct_reorder(character, n), y = n)) + 
+  geom_col(fill = "dodgerblue") + 
+  labs(x = "", y = "Number of 'That's what she said' lines", 
+       title = "The Office: That's what she said!", 
+       caption = "Source: schrute R package") + 
+  theme_minimal() + 
+  theme(axis.text.x = element_text(face = "bold", size = 10), 
+        axis.text.y = element_text(face = "bold", size = 10), 
+        axis.title.x = element_text(face = "bold", size = 12), 
+        axis.title.y = element_text(face = "bold", size = 12), 
+        plot.title = element_text(face = "bold", size = 14), 
+        plot.caption = element_text(color = "gray")) + 
+  coord_flip()
+```
+
+It looks like Michael says "That's what she said" the most, *by far*. Let's see what characters trigger this the most...
+```{r}
+office_scripts_twss_michael = office_scripts_twss %>%
+  filter(character == "Michael")
+
+View(office_scripts_twss_michael)
+
+office_scripts_twss_michael %>%
+  count(character_before, sort = TRUE) %>%
+  ggplot(aes(x = fct_reorder(character_before, n), y = n)) + 
+  geom_col(fill = "dodgerblue") +
+  ylim(0, 8) +
+  geom_label(aes(x = 6, y = 3.75, label = "Michael! You are making this harder than it has to be.")) +
+  geom_label(aes(x = 14, y = 5.5, label = "And you were directly under her the entire time?")) +
+  geom_label(aes(x = 4, y = 3.17, label = "And... go. Force it in as deep as you can.")) +
+  geom_label(aes(x = 2, y = 2.17, label = "You already did me.")) +
+  geom_label(aes(x = 7, y = 4.03, label = "Michael. Don't. Don't. Don't make it harder than it has to be.")) + 
+  labs(x = "", y = "Number of lines triggering a 'That's what she said'", 
+       title = "The Office: Who triggers Michael the most?",
+       subtitle = "Lines preceeding Michael saying 'That's what she said'", 
+       caption = "Source: schrute R package") + 
+  theme_bw() + 
+  theme(axis.text.x = element_text(face = "bold", size = 10), 
+        axis.text.y = element_text(face = "bold", size = 10), 
+        axis.title.x = element_text(face = "bold", size = 12), 
+        axis.title.y = element_text(face = "bold", size = 12), 
+        plot.title = element_text(face = "bold", size = 14), 
+        plot.caption = element_text(color = "gray")) + 
+  coord_flip()
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 How many lines does each main character have:
 ```{r}
 office_scripts_main = office_scripts %>%
@@ -58,14 +149,6 @@ str_which(office_scripts$text, pattern = "that's what she said")
 #office_scripts$text[c(4655, 5874)]
 
 str_subset(office_scripts$text, pattern = "That's what she said|that's what she said")
-```
-
-```{r}
-str_detect(office_scripts$text, pattern = "That's what she said|that's what she said")
-
-office_scripts = office_scripts %>%
-  mutate(twss_logical =
-           str_detect(text, pattern = "That's what she said|that's what she said"))
 ```
 
 See how many times "Michael" is referenced
