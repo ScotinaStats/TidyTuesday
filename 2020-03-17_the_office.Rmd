@@ -1,0 +1,90 @@
+Load packages and data
+```{r, warning = FALSE, message = FALSE}
+library(tidyverse)
+library(tidytext)
+library(ngram)
+library(schrute)
+office_ratings <- read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-03-17/office_ratings.csv')
+office_scripts <- schrute::theoffice
+#View(office_ratings)
+#View(office_scripts)
+```
+
+How many lines does each main character have:
+```{r}
+office_scripts_main = office_scripts %>%
+  filter(character %in% c("Michael", "Dwight", "Jim", "Pam", "Andy"))
+
+#View(office_scripts_main)
+
+office_scripts_main %>%
+  count(character, sort = TRUE) %>%
+  ggplot(aes(x = character, y = n)) + 
+  geom_col() + 
+  theme_minimal() + 
+  labs(x = "", y = "Number of Lines") +
+  scale_y_continuous(label = scales::comma) +
+  coord_flip() 
+```
+
+Count Number of *WORDS* per character:
+```{r}
+wordcount(office_scripts$text[1])
+
+
+office_scripts_season1 = office_scripts %>%
+  filter(season == 1) %>%
+  group_by(index) %>% # groups by each line
+  mutate(word_count = wordcount(text))
+  
+office_scripts_season1 %>%
+  group_by(character) %>%
+  summarize(total_words = sum(word_count), 
+            mean_words = mean(word_count)) %>%
+  #arrange(desc(mean_words))
+  top_n(5, wt = mean_words) %>%
+  ggplot(aes(x = fct_reorder(character, mean_words), y = mean_words)) + 
+  geom_col() + 
+  coord_flip() + 
+  theme_minimal()
+```
+
+
+Let's look at the phrase "that's what she said":
+- Use the `stringr` package functions (part of `tidyverse`)
+```{r}
+str_which(office_scripts$text, pattern = "that's what she said")
+
+#office_scripts$text[c(4655, 5874)]
+
+str_subset(office_scripts$text, pattern = "That's what she said|that's what she said")
+```
+
+```{r}
+str_detect(office_scripts$text, pattern = "That's what she said|that's what she said")
+
+office_scripts = office_scripts %>%
+  mutate(twss_logical =
+           str_detect(text, pattern = "That's what she said|that's what she said"))
+```
+
+See how many times "Michael" is referenced
+```{r}
+office_scripts %>%
+  mutate(michael_ref = 
+           str_detect(text, pattern = "Michael|michael")) %>%
+  group_by(character) %>%
+  summarize(N_michael = sum(michael_ref)) %>%
+  arrange(desc(N_michael)) 
+```
+
+Rating by episode
+```{r}
+p = office_ratings %>%
+  ggplot(aes(x = air_date, y = imdb_rating)) + 
+  geom_point() + 
+  geom_smooth(se = FALSE)
+
+plotly::ggplotly(p)
+```
+
