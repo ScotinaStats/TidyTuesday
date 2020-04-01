@@ -86,6 +86,78 @@ office_scripts_twss_michael %>%
   coord_flip()
 ```
 
+**Sentiment Analysis***
+
+- Are some words more *positive* or *negative*?
+
+- The *Bing* lexicon contains words, and whether or not that word has a *positive* or *negative* sentiment
+```{r}
+View(get_sentiments("bing"))
+```
+
+In order to judge sentiment of *words*
+- Use `unnest_tokens()` to get each *word* on its own line:
+- `input` is the name of the *existing* column that I want to unnest
+- `output` is the name of the new column (this will contain one word per row)
+```{r}
+#?unnest_tokens
+office_scripts_tidy = unnest_tokens(office_scripts, input = text, output = word)
+#View(office_scripts_tidy)
+```
+
+Now let's **join** the *Bing* lexicon to the Office script data. 
+- Use `inner_join()` to join the Bing lexicon words and the words from the Office
+- But only keep the words that appear in *BOTH* tables (e.g., this will remove "stop words" from the Office data)
+```{r}
+office_scripts_sentiment = office_scripts_tidy %>%
+  inner_join(get_sentiments("bing"), by = "word")
+#View(office_scripts_sentiment)
+```
+
+Let's see which *positive* and *negative* words are used the most frequently. 
+```{r}
+office_scripts_sentiment %>%
+  count(sentiment, word, sort = TRUE)
+```
+
+Sentiment "scores" for each episode:
+```{r}
+office_scripts_sentiment %>%
+  group_by(episode_name) %>%
+  count(sentiment, sort = TRUE) 
+
+
+office_scripts_sentiment %>%
+  count(episode_name, sentiment) %>%
+  spread(sentiment, n) %>%
+  group_by(episode_name) %>%
+  mutate(sentiment_score = positive - negative, 
+         positive_prop = sum(positive)/(sum(positive)+sum(negative))) %>%
+  ggplot(aes(x = episode_name, y = positive_prop)) + 
+  geom_col() + 
+  coord_flip()
+```
+
+Uh oh, that's ugly. Let's do something better...
+- Look at *distribution* of `positive_prop` *by season*
+```{r}
+library(ggridges)
+office_scripts_sentiment %>%
+  count(season, episode, sentiment) %>%
+  spread(sentiment, n) %>%
+  group_by(season, episode) %>%
+  mutate(sentiment_score = positive - negative, 
+         positive_prop = sum(positive)/(sum(positive)+sum(negative))) %>%
+ ggplot(aes(x = positive_prop, y = factor(season))) + 
+  geom_density_ridges() + 
+  theme_minimal() + 
+  labs(x = "Proportion of positive words (by episode)", y = "Season Number", 
+       title = "The Office: Distribution of Positive Sentiment Words")
+```
+
+
+
+
 
 
 
