@@ -1,0 +1,184 @@
+```{r, message = FALSE, warning = FALSE}
+# Load packages
+library(tidyverse)
+library(ggthemr)
+library(tidytext)
+library(ggwordcloud)
+library(ggpattern)
+library(extrafont)
+loadfonts()
+
+#ggthemr("fresh", type = "outer", layout = "minimal")
+#ggthemr("chalk", type = "outer", layout = "minimal")
+ggthemr("grape", type = "outer", layout = "minimal")
+
+# Get the data
+critic <- read_tsv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-05-05/critic.tsv')
+user_reviews <- read_tsv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-05-05/user_reviews.tsv')
+items <- read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-05-05/items.csv')
+villagers <- read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-05-05/villagers.csv')
+```
+
+```{r, eval = FALSE}
+View(critic)
+View(user_reviews)
+View(items)
+View(villagers)
+```
+
+```{r}
+items %>%
+  count(sources, sort = TRUE)
+```
+
+- 329 items from Nook's Cranny
+- 3663 items from 'NA' source...
+    - Includes photos of villagers, clothes, craftables, etc.
+
+```{r}
+items %>%
+  filter(is.na(sources)) %>%
+  pull(name) 
+```
+
+Remove duplicate rows (probably based on different colors of same item)
+```{r}
+items_dup <- items %>%
+  distinct(name, .keep_all = TRUE)
+```
+
+```{r}
+items %>%
+  count(category, sort = TRUE)
+```
+
+*Defeating Tom Nook*
+
+- Which item categories tend to have the highest buyback prices, *that you can't buy from Nook-related businesses*?
+
+```{r}
+items_dup %>%
+  filter(!str_detect(sources, pattern = "Nook") | is.na(sources)) %>%
+  group_by(category) %>%
+  summarize(avg_buyback = mean(sell_value, na.rm = TRUE)) %>%
+  ggplot(aes(x = fct_reorder(category, avg_buyback), y = avg_buyback)) + 
+  geom_col(fill = "tan3", color = "gray89") + 
+  labs(x = "", y = "Average Sell Value (in bells)", 
+       title = "Defeating Tom Nook", 
+       subtitle = "Which non-Nook items have the highest sell value?", 
+       caption = "Source: TidyTuesday and VillagerDB") +
+  theme(text = element_text(size = 14, family = "FinkHeavy"), 
+        plot.caption = element_text(size = 10)) +
+  scale_y_continuous(labels = scales::comma) +
+  coord_flip()
+```
+
+These categories tend to have the highest sell value, *on average*:
+
+- furniture
+- hats
+- fish
+- fossils
+- tools
+
+*If Tom Nook is defeated, how can we live?*
+
+```{r}
+items_dup %>%
+  filter(category == "Furniture") %>%
+  pull(name)
+```
+
+- It looks like there is still a lot of furniture that one can obtain through means other than Nook businesses!
+
+* * * 
+
+*Which non-Nook furniture sells for the most bells?*
+
+```{r}
+items_dup %>%
+  filter(category == "Furniture") %>%
+  filter(!str_detect(sources, pattern = "Nook") | is.na(sources)) %>%
+  filter(name != "Robot Hero") %>% # Robot Hero comes from Nook Miles shopping
+  top_n(10, sell_value) %>%
+  arrange(desc(sell_value))
+```
+
+```{r}
+items_top5 <- items_dup %>%
+  filter(category == "Furniture" & name != "Robot Hero") %>% # Robot Hero recipe redeemed using Nook Miles
+  filter(!str_detect(sources, pattern = "Nook") | is.na(sources)) %>%
+  mutate(name = fct_reorder(name, sell_value)) %>%
+  top_n(5, wt = sell_value)
+
+image_urls <- items_top5 %>%
+  mutate(image_url = fct_reorder(image_url, sell_value)) %>%
+  pull(image_url)
+image_urls <- levels(image_urls)
+
+
+items_top5 %>%
+  ggplot(aes(x = name, y = sell_value)) +
+  geom_col_pattern(aes(pattern_filename = name),
+    pattern         = 'image',
+    pattern_type    = 'none',
+    fill            = 'tan3',
+    colour          = 'gray89',
+    pattern_scale   = 1,
+    pattern_filter  = 'point',
+    pattern_gravity = 'east'
+  ) + 
+  theme(legend.position = 'none') +
+  scale_pattern_filename_discrete(choices = image_urls) +
+  scale_pattern_discrete(guide = guide_legend(nrow = 1)) + 
+  labs(x = "", y = "Average Sell Value (in bells)", 
+       title = "Defeating Tom Nook", 
+       subtitle = "Which non-Nook items have the highest sell value?\n(top 5 furniture items, by sell value)", 
+       caption = "Source: TidyTuesday and VillagerDB") +
+  theme(text = element_text(size = 14, family = "FinkHeavy"), 
+        plot.caption = element_text(size = 10)) +
+  scale_y_continuous(labels = scales::comma) +
+  coord_flip()
+```
+
+
+
+* * * 
+
+*Do the reviews have anything to add about Nook?*
+
+```{r}
+user_sentiment <- user_reviews %>%
+  filter(str_detect(text, pattern = "nook|Nook")) %>%
+  unnest_tokens(output = word, input = text, token = "words") %>%
+  anti_join(stop_words) %>%
+  left_join(get_sentiments("bing"), by = "word") %>%
+  filter((!is.na(sentiment)) | (word == "nook")) %>%
+  mutate(sentiment_group = 
+           case_when(
+             sentiment == "negative" ~ "negative",
+             sentiment == "positive" ~ "positive",
+             is.na(sentiment) ~ "nook"), 
+         word = str_to_upper(word)) %>%
+  mutate(sentiment_group = factor(sentiment_group, levels = c("nook", "negative", "positive"))) %>%
+  add_count(word) %>%
+  distinct(word, .keep_all = TRUE) %>%
+  group_by(sentiment_group) %>%
+  arrange(desc(n)) %>%
+  slice(1:50) %>%
+  ungroup()
+
+user_sentiment %>%
+  ggplot(aes(label = word, size = n, color = sentiment_group)) + 
+  geom_text_wordcloud(family = "FinkHeavy", seed = 12, eccentricity = 1) + 
+  scale_color_manual(values = c("black", "tan3", "#31854e"), guide = F) +
+  scale_size_area(max_size = 10) +
+  labs(title = "What do players think about Nook?", 
+       subtitle = "(Because user reviews that mention Nook are clearly *about* Nook...)", 
+       caption = "Source: TidyTuesday and VillagerDB") +
+  theme(line = element_blank(), 
+        text = element_text(size = 14, family = "FinkHeavy"),
+        plot.caption = element_text(size = 10)) 
+
+```
+
